@@ -53,7 +53,10 @@ The design goal is CI-friendly execution with no Minecraft runtime or GUI depend
 2. **Run fixture test with debug output**
    - `gradle test --tests com.cope.addonparser.FixtureScanTest --rerun-tasks --no-daemon --info --stacktrace`
 
-3. **Generate JSON output**
+3. **Download latest release fixture jars (Java/Gradle)**
+   - `gradle downloadLatestReleaseJars --no-daemon`
+
+4. **Generate JSON output**
    - `gradle run --no-daemon --args="--input fixtures/addons/jars --output output/poc-scan --summary output/poc-scan/summary.json"`
 
 ## Mapping Behavior (Automatic)
@@ -118,5 +121,6 @@ Useful system properties:
 
 1. File size differences between versioned addon JSONs can be legitimate if module sets differ by jar version.
 2. `ai_reference/addons` contains cloned third-party repos; do not treat their internal docs/scripts as core project logic.
-3. `tools/download_yarn_mappings.py` and `tools/download_latest_release_jars.py` are helper scripts only; core flow does not require them.
-4. Runnable jar fixtures are stored in `fixtures/addons/jars`, separate from `ai_reference/` by design.
+3. `tools/download_latest_release_jars.py` is now clone-only (syncs addon repos into `ai_reference/addons` from `tools/addon_repos.csv`).
+4. Latest release fixture jar downloading is handled by Java (`gradle downloadLatestReleaseJars`), not Python.
+5. Runnable jar fixtures are stored in `fixtures/addons/jars`, separate from `ai_reference/` by design.

@@ -2,339 +2,219 @@
 import argparse
 import csv
 import json
-import os
-import re
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 
-GITHUB_API = "https://api.github.com"
-USER_AGENT = "addon-release-fetcher/1.0"
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 DEFAULT_ADDONS_DIR = PROJECT_ROOT / "ai_reference" / "addons"
-DEFAULT_JARS_DIR = PROJECT_ROOT / "fixtures" / "addons" / "jars"
-
-
-def get_token() -> Optional[str]:
-    return os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+DEFAULT_MANIFEST = SCRIPT_DIR / "addon_repos.csv"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Download latest GitHub release jar assets for all addon repos."
+        description=(
+            "Sync addon source repositories for ai_reference/addons. "
+            "Release jar downloading now lives in Java via Gradle task "
+            "'downloadLatestReleaseJars'."
+        )
     )
     parser.add_argument(
         "--addons-dir",
         default=str(DEFAULT_ADDONS_DIR),
-        help=f"Directory containing addon git repos (default: {DEFAULT_ADDONS_DIR})",
+        help=f"Directory where addon repos are cloned (default: {DEFAULT_ADDONS_DIR})",
     )
     parser.add_argument(
-        "--jars-dir",
-        default=str(DEFAULT_JARS_DIR),
-        help=f"Output directory for downloaded fixture jars (default: {DEFAULT_JARS_DIR})",
+        "--manifest",
+        default=str(DEFAULT_MANIFEST),
+        help=f"CSV manifest with columns folder,repo_url (default: {DEFAULT_MANIFEST})",
+    )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="If set, also fetch and fast-forward pull repos that already exist.",
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=1,
+        help="Depth to use for new clones (default: 1; use <=0 for full history).",
+    )
+    parser.add_argument(
+        "--summary-json",
+        default="",
+        help="Optional output file for clone summary JSON (default: <addons-dir>/clone-summary.json).",
     )
     return parser.parse_args()
 
 
-def api_get_json(path: str, token: Optional[str]) -> Tuple[Optional[object], Optional[str], int]:
-    url = f"{GITHUB_API}{path}"
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": USER_AGENT,
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            status = getattr(resp, "status", 200)
-            raw = resp.read().decode("utf-8", errors="replace")
-            return json.loads(raw), None, status
-    except urllib.error.HTTPError as e:
-        try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            body = str(e)
-        return None, f"HTTP {e.code}: {body}", e.code
-    except Exception as e:
-        return None, str(e), -1
+def run_git(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
+    proc = subprocess.run(
+        args,
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = "\n".join(x for x in [proc.stdout.strip(), proc.stderr.strip()] if x).strip()
+    return proc.returncode, combined
 
 
-def download_file(url: str, out_path: Path, token: Optional[str]) -> Tuple[bool, str]:
-    headers = {"User-Agent": USER_AGENT}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = resp.read()
-        out_path.write_bytes(data)
-        if out_path.stat().st_size <= 0:
-            return False, "downloaded file was empty"
-        return True, ""
-    except Exception as e:
-        return False, str(e)
+def normalize_remote(url: str) -> str:
+    trimmed = url.strip()
+    if trimmed.endswith(".git"):
+        trimmed = trimmed[: -len(".git")]
+    return trimmed.rstrip("/")
 
 
-def get_origin_url(repo_dir: Path) -> Optional[str]:
-    try:
-        p = subprocess.run(
-            ["git", "-C", str(repo_dir), "remote", "get-url", "origin"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if p.returncode != 0:
-            return None
-        origin = p.stdout.strip()
-        return origin or None
-    except Exception:
-        return None
+def load_manifest(manifest_path: Path) -> list[dict]:
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"manifest not found: {manifest_path}")
+
+    with manifest_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        required = {"folder", "repo_url"}
+        if reader.fieldnames is None or not required.issubset(set(reader.fieldnames)):
+            raise ValueError("manifest must include header columns: folder,repo_url")
+
+        rows = []
+        seen = set()
+        for row in reader:
+            folder = (row.get("folder") or "").strip()
+            repo_url = (row.get("repo_url") or "").strip()
+            if not folder or not repo_url:
+                continue
+            key = folder.lower()
+            if key in seen:
+                raise ValueError(f"duplicate folder in manifest: {folder}")
+            seen.add(key)
+            rows.append({"folder": folder, "repo_url": repo_url})
+        return rows
 
 
-def parse_github_slug(origin: str) -> Optional[str]:
-    patterns = [
-        r"github\.com[:/](?P<slug>[^/]+/[^/.]+?)(?:\.git)?$",
-        r"^https?://github\.com/(?P<slug>[^/]+/[^/.]+?)(?:\.git)?/?$",
-        r"^git@github\.com:(?P<slug>[^/]+/[^/.]+?)(?:\.git)?$",
-    ]
-    for pat in patterns:
-        m = re.search(pat, origin)
-        if m:
-            return m.group("slug")
-    return None
+def clone_repo(repo_url: str, target_dir: Path, depth: int) -> tuple[bool, str]:
+    clone_cmd = ["git", "clone"]
+    if depth > 0:
+        clone_cmd += ["--depth", str(depth)]
+    clone_cmd += [repo_url, str(target_dir)]
+    code, out = run_git(clone_cmd)
+    return code == 0, out
 
 
-def get_latest_release(slug: str, token: Optional[str]) -> Tuple[Optional[Dict], str, str]:
-    latest, err, code = api_get_json(f"/repos/{slug}/releases/latest", token)
-    if latest is not None and isinstance(latest, dict):
-        return latest, "latest", ""
+def update_repo(repo_dir: Path) -> tuple[bool, str]:
+    fetch_code, fetch_out = run_git(
+        ["git", "-C", str(repo_dir), "fetch", "--all", "--tags", "--prune"]
+    )
+    if fetch_code != 0:
+        return False, fetch_out
 
-    releases, err2, _ = api_get_json(f"/repos/{slug}/releases?per_page=1", token)
-    if releases is not None and isinstance(releases, list) and len(releases) > 0 and isinstance(releases[0], dict):
-        return releases[0], "releases_list_first", ""
-
-    if err2:
-        return None, "", err2
-    if err:
-        return None, "", err
-    if code == 404:
-        return None, "", "no releases found"
-    return None, "", "unable to resolve latest release"
+    pull_code, pull_out = run_git(["git", "-C", str(repo_dir), "pull", "--ff-only"])
+    if pull_code != 0:
+        return False, pull_out
+    return True, "\n".join(x for x in [fetch_out, pull_out] if x).strip()
 
 
-def sanitize_filename(name: str) -> str:
-    return re.sub(r'[<>:"/\\|?*]+', "_", name)
+def get_origin(repo_dir: Path) -> str:
+    code, out = run_git(["git", "-C", str(repo_dir), "remote", "get-url", "origin"])
+    if code != 0:
+        return ""
+    return out.strip()
 
 
 def main() -> int:
     args = parse_args()
     addons_dir = Path(args.addons_dir).resolve()
-    jars_dir = Path(args.jars_dir).resolve()
-    jars_dir.mkdir(parents=True, exist_ok=True)
-    token = get_token()
-
-    if not addons_dir.is_dir():
-        print(f"addons directory not found: {addons_dir}", file=sys.stderr)
-        return 2
-
-    entries: List[Dict] = []
-
-    repo_dirs = sorted(
-        [d for d in addons_dir.iterdir() if d.is_dir() and d.name.lower() != "jars"],
-        key=lambda p: p.name.lower(),
+    manifest_path = Path(args.manifest).resolve()
+    summary_json = (
+        Path(args.summary_json).resolve()
+        if args.summary_json.strip()
+        else addons_dir / "clone-summary.json"
     )
 
-    for addon_dir in repo_dirs:
-        git_dir = addon_dir / ".git"
-        if not git_dir.exists():
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": "",
-                    "release_tag": "",
-                    "release_name": "",
-                    "release_url": "",
-                    "published_at": "",
-                    "releases_url": "",
-                    "asset_name": "",
-                    "asset_url": "",
-                    "downloaded_to": "",
-                    "status": "not_a_git_repo",
-                    "note": "",
-                }
-            )
-            continue
+    try:
+        manifest_rows = load_manifest(manifest_path)
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        return 2
 
-        origin = get_origin_url(addon_dir)
-        if not origin:
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": "",
-                    "release_tag": "",
-                    "release_name": "",
-                    "release_url": "",
-                    "published_at": "",
-                    "releases_url": "",
-                    "asset_name": "",
-                    "asset_url": "",
-                    "downloaded_to": "",
-                    "status": "missing_origin",
-                    "note": "",
-                }
-            )
-            continue
+    addons_dir.mkdir(parents=True, exist_ok=True)
 
-        slug = parse_github_slug(origin)
-        if not slug:
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": origin,
-                    "release_tag": "",
-                    "release_name": "",
-                    "release_url": "",
-                    "published_at": "",
-                    "releases_url": "",
-                    "asset_name": "",
-                    "asset_url": "",
-                    "downloaded_to": "",
-                    "status": "non_github_or_unparsed_remote",
-                    "note": "",
-                }
-            )
-            continue
+    entries: list[dict] = []
+    failure_statuses = {
+        "path_exists_not_git",
+        "origin_mismatch",
+        "clone_failed",
+        "update_failed",
+    }
 
-        release, source, release_err = get_latest_release(slug, token)
-        releases_url = f"https://github.com/{slug}/releases"
-        if not release:
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": slug,
-                    "release_tag": "",
-                    "release_name": "",
-                    "release_url": "",
-                    "published_at": "",
-                    "releases_url": releases_url,
-                    "asset_name": "",
-                    "asset_url": "",
-                    "downloaded_to": "",
-                    "status": "no_releases_found",
-                    "note": release_err,
-                }
-            )
-            continue
+    for row in manifest_rows:
+        folder = row["folder"]
+        repo_url = row["repo_url"]
+        target = addons_dir / folder
+        status = "unknown"
+        note = ""
 
-        assets = release.get("assets") or []
-        jar_assets = [a for a in assets if str(a.get("name", "")).lower().endswith(".jar")]
+        if target.exists() and not (target / ".git").exists():
+            status = "path_exists_not_git"
+            note = "target path exists but is not a git repository"
+        elif (target / ".git").exists():
+            current_origin = get_origin(target)
+            expected = normalize_remote(repo_url)
+            actual = normalize_remote(current_origin)
+            if not current_origin:
+                status = "origin_mismatch"
+                note = "unable to read origin remote"
+            elif expected != actual:
+                status = "origin_mismatch"
+                note = f"expected_origin={repo_url};actual_origin={current_origin}"
+            elif args.update:
+                ok, output = update_repo(target)
+                status = "updated" if ok else "update_failed"
+                note = output
+            else:
+                status = "exists"
+        else:
+            ok, output = clone_repo(repo_url, target, args.depth)
+            status = "cloned" if ok else "clone_failed"
+            note = output
 
-        if not jar_assets:
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": slug,
-                    "release_tag": release.get("tag_name", ""),
-                    "release_name": release.get("name", ""),
-                    "release_url": release.get("html_url", ""),
-                    "published_at": release.get("published_at", ""),
-                    "releases_url": releases_url,
-                    "asset_name": "",
-                    "asset_url": "",
-                    "downloaded_to": "",
-                    "status": "release_found_no_jar_assets",
-                    "note": f"source={source}",
-                }
-            )
-            continue
+        entries.append(
+            {
+                "folder": folder,
+                "repo_url": repo_url,
+                "target_dir": str(target),
+                "status": status,
+                "note": note,
+            }
+        )
 
-        for asset in jar_assets:
-            asset_name = str(asset.get("name", "")).strip()
-            asset_url = str(asset.get("browser_download_url", "")).strip()
-            if not asset_name or not asset_url:
-                entries.append(
-                    {
-                        "addon_folder": addon_dir.name,
-                        "repo": slug,
-                        "release_tag": release.get("tag_name", ""),
-                        "release_name": release.get("name", ""),
-                        "release_url": release.get("html_url", ""),
-                        "published_at": release.get("published_at", ""),
-                        "releases_url": releases_url,
-                        "asset_name": asset_name,
-                        "asset_url": asset_url,
-                        "downloaded_to": "",
-                        "status": "failed_download",
-                        "note": "asset missing name/url",
-                    }
-                )
-                continue
-
-            out_name = sanitize_filename(f"{addon_dir.name}--{asset_name}")
-            out_path = jars_dir / out_name
-            ok, err = download_file(asset_url, out_path, token)
-
-            entries.append(
-                {
-                    "addon_folder": addon_dir.name,
-                    "repo": slug,
-                    "release_tag": release.get("tag_name", ""),
-                    "release_name": release.get("name", ""),
-                    "release_url": release.get("html_url", ""),
-                    "published_at": release.get("published_at", ""),
-                    "releases_url": releases_url,
-                    "asset_name": asset_name,
-                    "asset_url": asset_url,
-                    "downloaded_to": str(out_path) if ok else "",
-                    "status": "downloaded" if ok else "failed_download",
-                    "note": f"source={source}" if ok else f"source={source};error={err}",
-                }
-            )
-
-    summary_json = jars_dir / "release-summary.json"
-    summary_csv = jars_dir / "release-summary.csv"
-    summary_txt = jars_dir / "release-summary.txt"
-
+    summary_json.parent.mkdir(parents=True, exist_ok=True)
     summary_json.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-    if entries:
-        with summary_csv.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(entries[0].keys()))
-            writer.writeheader()
-            writer.writerows(entries)
-    else:
-        summary_csv.write_text("", encoding="utf-8")
 
-    downloaded_count = sum(1 for e in entries if e["status"] == "downloaded")
-    repo_count = len({e["addon_folder"] for e in entries})
-    no_release = sum(1 for e in entries if e["status"] == "no_releases_found")
-    no_jar = sum(1 for e in entries if e["status"] == "release_found_no_jar_assets")
-    failed = sum(1 for e in entries if e["status"] == "failed_download")
+    cloned = sum(1 for e in entries if e["status"] == "cloned")
+    exists = sum(1 for e in entries if e["status"] == "exists")
+    updated = sum(1 for e in entries if e["status"] == "updated")
+    failed = sum(1 for e in entries if e["status"] in failure_statuses)
 
     lines = [
         f"timestamp_utc={datetime.now(timezone.utc).isoformat()}",
         f"addons_dir={addons_dir}",
-        f"jars_dir={jars_dir}",
-        f"repos_seen={repo_count}",
-        f"downloaded_jars={downloaded_count}",
-        f"no_releases={no_release}",
-        f"releases_without_jars={no_jar}",
-        f"failed_downloads={failed}",
+        f"manifest={manifest_path}",
+        f"repos_total={len(entries)}",
+        f"cloned={cloned}",
+        f"exists={exists}",
+        f"updated={updated}",
+        f"failures={failed}",
         f"summary_json={summary_json}",
-        f"summary_csv={summary_csv}",
+        "next_step=Run `gradle downloadLatestReleaseJars --no-daemon` to fetch release jars.",
     ]
-    summary_txt.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
     print("\n".join(lines))
-    return 0
+
+    return 1 if failed > 0 else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

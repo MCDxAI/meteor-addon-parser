@@ -63,6 +63,7 @@ sourceSets {
 
 dependencies {
     stubgenImplementation 'org.ow2.asm:asm:9.7.1'
+    stubgenImplementation 'com.google.code.gson:gson:2.11.0'
 }
 
 tasks.register('generateStubs', JavaExec) {
@@ -77,6 +78,20 @@ tasks.register('generateStubs', JavaExec) {
     inputs.file('tools/manual_classes.txt')
     inputs.files(sourceSets.stubgen.output)
     outputs.dir('src/generated/java')
+}
+
+tasks.register('downloadLatestReleaseJars', JavaExec) {
+    group = 'build setup'
+    description = 'Downloads latest GitHub release jar assets for repos under ai_reference/addons.'
+    classpath = sourceSets.stubgen.runtimeClasspath
+    mainClass = 'com.cope.addonparser.tools.ReleaseJarDownloader'
+    args '--addons-dir', 'ai_reference/addons',
+        '--jars-dir', 'fixtures/addons/jars',
+        '--fail-on-error'
+
+    inputs.dir('ai_reference/addons')
+    outputs.dir('fixtures/addons/jars')
+    outputs.upToDateWhen { false }
 }
 
 tasks.named('compileJava') {
