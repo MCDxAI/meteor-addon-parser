@@ -50,7 +50,7 @@ jobs:
         run: gradle downloadLatestReleaseJars --no-daemon
 
       - name: Run test suite
-        run: gradle test --no-daemon
+        run: gradle test --no-daemon -PautoGenerateStubs
 
       - name: Upload release summaries
         if: always()
