@@ -5,5 +5,5 @@ import meteordevelopment.meteorclient.gui.WidgetScreen;
 
 @FunctionalInterface
 public interface IScreenFactory {
-    WidgetScreen createScreen(GuiTheme theme);
+  WidgetScreen createScreen(GuiTheme theme);
 }

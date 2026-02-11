@@ -4,12 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class AddonManager {
-    public static final List<MeteorAddon> ADDONS = new ArrayList<>();
+  public static final List<MeteorAddon> ADDONS = new ArrayList<>();
 
-    private AddonManager() {
-    }
+  private AddonManager() {}
 
-    public static void reset() {
-        ADDONS.clear();
-    }
+  public static void reset() {
+    ADDONS.clear();
+  }
 }

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.diffplug.spotless' version '7.0.2'
 }
 
 group = 'com.cope.addonparser'
@@ -70,12 +71,64 @@ tasks.register('generateStubs', JavaExec) {
     args '--input-dir', 'fixtures/addons/jars',
         '--output-dir', 'src/generated/java',
         '--manual-class-list', 'tools/manual_classes.txt'
+
+    // Incremental support: declare inputs and outputs
+    inputs.dir('fixtures/addons/jars')
+    inputs.file('tools/manual_classes.txt')
+    inputs.files(sourceSets.stubgen.output)
+    outputs.dir('src/generated/java')
 }
 
-compileJava.dependsOn tasks.named('generateStubs')
+tasks.named('compileJava') {
+    mustRunAfter tasks.named('generateStubs')
+}
+
+tasks.register('verifyGeneratedStubs') {
+    group = 'verification'
+    description = 'Regenerates stubs and fails if src/generated/java changes.'
+    dependsOn tasks.named('generateStubs')
+
+    doLast {
+        def output = new ByteArrayOutputStream()
+        exec {
+            commandLine 'git', 'status', '--porcelain', '--', 'src/generated/java'
+            standardOutput = output
+        }
+
+        def diff = output.toString('UTF-8').trim()
+        if (!diff.isEmpty()) {
+            throw new GradleException(
+                "Generated stubs are out of date. Run 'gradle generateStubs' and commit src/generated/java.\n${diff}"
+            )
+        }
+    }
+}
+
+// Only auto-generate stubs when explicitly requested or property is set
+if (project.hasProperty('autoGenerateStubs')) {
+    compileJava.dependsOn tasks.named('generateStubs')
+}
+
+if (project.hasProperty('verifyGeneratedStubs') || 'true'.equalsIgnoreCase(System.getenv('CI'))) {
+    tasks.named('check') {
+        dependsOn tasks.named('verifyGeneratedStubs')
+    }
+}
 
 tasks.named('clean') {
     doLast {
         delete 'src/generated/java'
+    }
+}
+
+// AP-009: Spotless configuration for Google Java Style on manual sources
+spotless {
+    java {
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/stubgen/java/**/*.java'
+        targetExclude 'src/generated/java/**'
+        googleJavaFormat()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }

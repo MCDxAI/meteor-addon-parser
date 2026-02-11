@@ -1,35 +1,34 @@
 package meteordevelopment.meteorclient.systems.hud;
 
-import meteordevelopment.meteorclient.systems.System;
-
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import meteordevelopment.meteorclient.systems.System;
 
 public final class Hud extends System<Hud> implements Iterable<HudElementInfo<?>> {
-    private static final Hud INSTANCE = new Hud();
-    public static final HudGroup GROUP = new HudGroup("Meteor");
+  private static final Hud INSTANCE = new Hud();
+  public static final HudGroup GROUP = new HudGroup("Meteor");
 
-    public final Map<String, HudElementInfo<?>> infos = new LinkedHashMap<>();
+  public final Map<String, HudElementInfo<?>> infos = new LinkedHashMap<>();
 
-    private Hud() {
-        super("hud");
-    }
+  private Hud() {
+    super("hud");
+  }
 
-    public static Hud get() {
-        return INSTANCE;
-    }
+  public static Hud get() {
+    return INSTANCE;
+  }
 
-    public void register(HudElementInfo<?> info) {
-        if (info != null) infos.put(info.name, info);
-    }
+  public void register(HudElementInfo<?> info) {
+    if (info != null) infos.put(info.name, info);
+  }
 
-    @Override
-    public Iterator<HudElementInfo<?>> iterator() {
-        return infos.values().iterator();
-    }
+  @Override
+  public Iterator<HudElementInfo<?>> iterator() {
+    return infos.values().iterator();
+  }
 
-    public void reset() {
-        infos.clear();
-    }
+  public void reset() {
+    infos.clear();
+  }
 }
