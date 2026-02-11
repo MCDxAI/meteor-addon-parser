@@ -1,0 +1,16 @@
+# Build output
+build/
+output/
+.gradle/
+
+# Temporary files
+tmp/
+
+# AI reference materials
+ai_reference/
+
+# Mappings
+mappings/
+
+# Local fixture jars
+fixtures/addons/jars/
