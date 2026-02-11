@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
 
 permissions:
@@ -34,23 +35,22 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.12.1"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Ensure Gradle wrapper is executable
-        run: chmod +x gradlew
-
       - name: Sync addon source repos
         run: python tools/download_latest_release_jars.py --update
 
       - name: Download latest release fixture jars
-        run: ./gradlew downloadLatestReleaseJars --no-daemon
+        run: gradle downloadLatestReleaseJars --no-daemon
 
       - name: Run test suite
-        run: ./gradlew test --no-daemon
+        run: gradle test --no-daemon
 
       - name: Upload release summaries
         if: always()
