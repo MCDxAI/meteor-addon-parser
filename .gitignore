@@ -14,3 +14,9 @@ mappings/
 
 # Local fixture jars
 fixtures/addons/jars/
+
+# Generated source
+src/generated/
+
+# Python cache
+tools/__pycache__/
