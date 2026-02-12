@@ -4,7 +4,7 @@
 
 **Headless Java scanner for Meteor Client addons**
 
-![Java](https://img.shields.io/badge/Java-21-orange?style=flat) ![Gradle](https://img.shields.io/badge/Gradle-8.12.1-02303A?style=flat) ![Version](https://img.shields.io/badge/Version-0.1.0-purple?style=flat) ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+![Java](https://img.shields.io/badge/Java-21-orange?style=flat) ![Gradle](https://img.shields.io/badge/Gradle-8.12.1-02303A?style=flat) ![Version](https://img.shields.io/badge/Version-0.1.0-purple?style=flat)
 
 **Extract module metadata, settings, and configuration from addon JARs without running Minecraft**
 
