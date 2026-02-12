@@ -102,8 +102,9 @@
 | `--verbose` | Enable detailed logging output |
 
 </div>
-
-**Example:**
+<div align="center">
+<b>Example:</b>
+</div>
 
 ```bash
 gradle run --args="--input /path/to/addons --output ./results --mode ISOLATED"
@@ -124,7 +125,9 @@ gradle run --args="--input /path/to/addons --output ./results --mode ISOLATED"
 
 </div>
 
-**Module metadata includes:**
+<div align="center">
+</b>Module metadata includes:</b>
+</div>
 
 <div align="center">
 
