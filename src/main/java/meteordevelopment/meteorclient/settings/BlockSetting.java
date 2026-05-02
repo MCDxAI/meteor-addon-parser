@@ -27,10 +27,12 @@ public class BlockSetting extends Setting<net.minecraft.class_2248> {
     return value != null && (filter == null || filter.test(value));
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected net.minecraft.class_2248 load(net.minecraft.class_2487 tag) {
     return value;
   }

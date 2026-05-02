@@ -29,6 +29,7 @@ public class BlockDataSetting<T> extends Setting<Map<net.minecraft.class_2248, T
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }

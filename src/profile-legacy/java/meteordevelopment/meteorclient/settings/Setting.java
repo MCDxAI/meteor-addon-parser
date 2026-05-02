@@ -104,6 +104,7 @@ public abstract class Setting<T> implements IGetter<T>, ISerializable<T> {
 
   protected abstract net.minecraft.class_2487 save(net.minecraft.class_2487 tag);
 
+  @Override
   public net.minecraft.class_2487 toTag() {
     net.minecraft.class_2487 tag = new net.minecraft.class_2487();
     return save(tag);
@@ -111,6 +112,7 @@ public abstract class Setting<T> implements IGetter<T>, ISerializable<T> {
 
   protected abstract T load(net.minecraft.class_2487 tag);
 
+  @Override
   public T fromTag(net.minecraft.class_2487 tag) {
     T loaded = load(tag);
     if (loaded != null) value = loaded;

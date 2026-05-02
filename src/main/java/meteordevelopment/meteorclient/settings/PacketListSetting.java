@@ -29,6 +29,7 @@ public class PacketListSetting extends Setting<Set<Class<?>>> {
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }

@@ -25,10 +25,12 @@ public class ColorListSetting extends Setting<List<SettingColor>> {
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected List<SettingColor> load(net.minecraft.class_2487 tag) {
     return value;
   }

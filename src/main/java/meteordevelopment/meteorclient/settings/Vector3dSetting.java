@@ -21,10 +21,12 @@ public class Vector3dSetting extends Setting<org.joml.Vector3d> {
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected org.joml.Vector3d load(net.minecraft.class_2487 tag) {
     return value;
   }

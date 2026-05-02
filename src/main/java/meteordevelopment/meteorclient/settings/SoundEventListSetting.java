@@ -24,10 +24,12 @@ public class SoundEventListSetting extends Setting<List<net.minecraft.class_3414
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected List<net.minecraft.class_3414> load(net.minecraft.class_2487 tag) {
     return value;
   }

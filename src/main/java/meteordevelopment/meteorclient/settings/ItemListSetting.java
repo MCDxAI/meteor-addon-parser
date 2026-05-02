@@ -29,10 +29,12 @@ public class ItemListSetting extends Setting<List<net.minecraft.class_1792>> {
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected List<net.minecraft.class_1792> load(net.minecraft.class_2487 tag) {
     return value;
   }

@@ -21,10 +21,12 @@ public class EnumSetting<T> extends Setting<T> {
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected T load(net.minecraft.class_2487 tag) {
     return value;
   }

@@ -28,10 +28,12 @@ public class EntityTypeListSetting extends Setting<Set<net.minecraft.class_1299>
     return value != null;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected Set<net.minecraft.class_1299> load(net.minecraft.class_2487 tag) {
     return value;
   }

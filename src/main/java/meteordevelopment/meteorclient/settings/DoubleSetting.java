@@ -45,10 +45,12 @@ public class DoubleSetting extends Setting<Double> {
     return value != null && value >= min && value <= max;
   }
 
+  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
+  @Override
   protected Double load(net.minecraft.class_2487 tag) {
     return value;
   }
