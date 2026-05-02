@@ -1,0 +1,62 @@
+package meteordevelopment.meteorclient.settings;
+
+import java.util.HashMap;
+import java.util.Map;
+import meteordevelopment.meteorclient.utils.misc.IGetter;
+
+public class BlockDataSetting<T> extends Setting<Map<net.minecraft.world.level.block.Block, T>> {
+  private final IGetter<T> defaultData;
+
+  private BlockDataSetting(
+      String name,
+      String description,
+      Map<net.minecraft.world.level.block.Block, T> defaultValue,
+      java.util.function.Consumer<Map<net.minecraft.world.level.block.Block, T>> onChanged,
+      java.util.function.Consumer<Setting<Map<net.minecraft.world.level.block.Block, T>>> onModuleActivated,
+      IVisible visible,
+      IGetter<T> defaultData) {
+    super(name, description, defaultValue, onChanged, onModuleActivated, visible);
+    this.defaultData = defaultData;
+  }
+
+  @Override
+  protected Map<net.minecraft.world.level.block.Block, T> parseImpl(String str) {
+    return value;
+  }
+
+  @Override
+  protected boolean isValueValid(Map<net.minecraft.world.level.block.Block, T> value) {
+    return value != null;
+  }
+
+  @Override
+  protected net.minecraft.nbt.CompoundTag save(net.minecraft.nbt.CompoundTag tag) {
+    return tag;
+  }
+
+  @Override
+  protected Map<net.minecraft.world.level.block.Block, T> load(net.minecraft.nbt.CompoundTag tag) {
+    return value;
+  }
+
+  public static class Builder<T>
+      extends Setting.SettingBuilder<
+          Builder<T>, Map<net.minecraft.world.level.block.Block, T>, BlockDataSetting<T>> {
+    private IGetter<T> defaultData;
+
+    public Builder() {
+      super(new HashMap<>());
+    }
+
+    public Builder<T> defaultData(IGetter<T> getter) {
+      this.defaultData = getter;
+      return this;
+    }
+
+    @Override
+    public BlockDataSetting<T> build() {
+      return new BlockDataSetting<>(
+          name, description, defaultValue, onChanged, onModuleActivated, visible, defaultData);
+    }
+  }
+}

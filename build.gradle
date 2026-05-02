@@ -9,9 +9,17 @@ version = '0.1.0'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
+
+// Mapping profile: selects which shim source dir is included in the main sourceSet.
+// Run gradle with -PparserProfile=legacy to build the 1.21.x flavor; default is 26x.
+ext.parserProfile = (project.findProperty('parserProfile') ?: '26x').toString().toLowerCase()
+if (parserProfile != 'legacy' && parserProfile != '26x') {
+    throw new GradleException("Unknown parserProfile: ${parserProfile} (expected 'legacy' or '26x')")
+}
+def profileSourceDir = parserProfile == 'legacy' ? 'src/profile-legacy/java' : 'src/profile-26x/java'
 
 repositories {
     mavenCentral()
@@ -21,8 +29,8 @@ repositories {
 
 dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
-    implementation 'org.ow2.asm:asm:9.7.1'
-    implementation 'org.ow2.asm:asm-commons:9.7.1'
+    implementation 'org.ow2.asm:asm:9.9'
+    implementation 'org.ow2.asm:asm-commons:9.9'
     implementation 'org.slf4j:slf4j-api:2.0.16'
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
     implementation 'org.apache.logging.log4j:log4j-api:2.24.3'
@@ -31,20 +39,23 @@ dependencies {
     implementation 'com.mojang:brigadier:1.0.18'
     implementation 'org.spongepowered:mixin:0.8.5'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-noverify'
+    systemProperty 'addonparser.profile', parserProfile
 }
 
 application {
     mainClass = 'com.cope.addonparser.cli.Main'
-    applicationDefaultJvmArgs = ['-noverify']
+    applicationDefaultJvmArgs = ['-noverify', "-Daddonparser.profile=${project.parserProfile}"]
 }
 
 tasks.named('run') {
     jvmArgs '-noverify'
+    systemProperty 'addonparser.profile', parserProfile
 }
 
 sourceSets {
@@ -56,13 +67,13 @@ sourceSets {
 
     main {
         java {
-            srcDirs += ['src/generated/java']
+            srcDirs += ['src/generated/java', profileSourceDir]
         }
     }
 }
 
 dependencies {
-    stubgenImplementation 'org.ow2.asm:asm:9.7.1'
+    stubgenImplementation 'org.ow2.asm:asm:9.9'
     stubgenImplementation 'com.google.code.gson:gson:2.11.0'
 }
 
@@ -71,11 +82,15 @@ tasks.register('generateStubs', JavaExec) {
     mainClass = 'com.cope.addonparser.tools.StubGenerator'
     args '--input-dir', 'fixtures/addons/jars',
         '--output-dir', 'src/generated/java',
-        '--manual-class-list', 'tools/manual_classes.txt'
+        '--manual-class-list', 'tools/manual_classes.txt',
+        '--manual-source-dirs', files('src/main/java', profileSourceDir).asPath,
+        '--profile', parserProfile
 
     // Incremental support: declare inputs and outputs
     inputs.dir('fixtures/addons/jars')
     inputs.file('tools/manual_classes.txt')
+    inputs.dir('src/main/java')
+    inputs.dir(profileSourceDir)
     inputs.files(sourceSets.stubgen.output)
     outputs.dir('src/generated/java')
 }
@@ -139,7 +154,8 @@ tasks.named('clean') {
 // AP-009: Spotless configuration for Google Java Style on manual sources
 spotless {
     java {
-        target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/stubgen/java/**/*.java'
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/stubgen/java/**/*.java',
+            'src/profile-legacy/java/**/*.java', 'src/profile-26x/java/**/*.java'
         targetExclude 'src/generated/java/**'
         googleJavaFormat()
         removeUnusedImports()

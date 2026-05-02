@@ -1,6 +1,7 @@
 package com.cope.addonparser.scanner;
 
 import com.cope.addonparser.model.JarScanResult;
+import com.cope.addonparser.profile.MappingProfile;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
@@ -22,13 +23,23 @@ public class IsolatedScanner implements AutoCloseable {
   private static final String WORKER_MAIN = ScanWorker.class.getName();
 
   private final long timeoutSeconds;
+  private final MappingProfile profile;
 
   public IsolatedScanner() {
-    this(DEFAULT_TIMEOUT_SECONDS);
+    this(DEFAULT_TIMEOUT_SECONDS, MappingProfile.fromSystemProperty());
+  }
+
+  public IsolatedScanner(MappingProfile profile) {
+    this(DEFAULT_TIMEOUT_SECONDS, profile);
   }
 
   public IsolatedScanner(long timeoutSeconds) {
+    this(timeoutSeconds, MappingProfile.fromSystemProperty());
+  }
+
+  public IsolatedScanner(long timeoutSeconds, MappingProfile profile) {
     this.timeoutSeconds = timeoutSeconds;
+    this.profile = profile;
   }
 
   public JarScanResult scan(Path jarPath) {
@@ -39,7 +50,7 @@ public class IsolatedScanner implements AutoCloseable {
     result.jarPath = absoluteJar.toString();
 
     try {
-      List<String> command = buildWorkerCommand(absoluteJar);
+      List<String> command = buildWorkerCommand(absoluteJar, profile);
       ProcessBuilder pb = new ProcessBuilder(command);
       pb.redirectErrorStream(false);
 
@@ -118,7 +129,7 @@ public class IsolatedScanner implements AutoCloseable {
     }
   }
 
-  private static List<String> buildWorkerCommand(Path jarPath) {
+  private static List<String> buildWorkerCommand(Path jarPath, MappingProfile profile) {
     List<String> cmd = new ArrayList<>();
     String javaHome = System.getProperty("java.home");
     String javaBin = Path.of(javaHome, "bin", "java").toString();
@@ -145,8 +156,12 @@ public class IsolatedScanner implements AutoCloseable {
       }
     }
 
+    cmd.add("-D" + MappingProfile.SYSTEM_PROPERTY + "=" + profile.cliValue());
+
     cmd.add(WORKER_MAIN);
     cmd.add(jarPath.toString());
+    cmd.add("--profile");
+    cmd.add(profile.cliValue());
 
     return cmd;
   }

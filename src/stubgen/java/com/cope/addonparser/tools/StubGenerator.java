@@ -1,5 +1,6 @@
 package com.cope.addonparser.tools;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,14 @@ public final class StubGenerator {
           "net/minecraft/class_6880",
           "net/minecraft/class_1269");
 
-  private record Args(Path inputDir, Path outputDir, Path manualClassList) {}
+  private record Args(
+      Path inputDir,
+      Path outputDir,
+      Path manualClassList,
+      List<Path> manualSourceDirs,
+      String profile) {}
+
+  private static Set<String> currentManualClasses = Set.of();
 
   private record ClassEntry(String internalName, byte[] bytes) {}
 
@@ -127,12 +135,13 @@ public final class StubGenerator {
     Args args = parseArgs(argv);
     if (args == null) {
       System.err.println(
-          "Usage: StubGenerator --input-dir <dir> --output-dir <dir> [--manual-class-list <file>]");
+          "Usage: StubGenerator --input-dir <dir> --output-dir <dir> [--manual-class-list <file>] [--profile legacy|26x]");
       System.exit(2);
       return;
     }
 
-    ManualClassConfig manual = loadManualClasses(args.manualClassList);
+    ManualClassConfig manual = loadManualClasses(args.manualClassList, args.manualSourceDirs);
+    currentManualClasses = manual.exactClasses;
     regenerateStubs(args.inputDir, args.outputDir, manual);
   }
 
@@ -408,30 +417,55 @@ public final class StubGenerator {
     if ("module-info".equals(internalName) || internalName.endsWith("/module-info")) return true;
     if (definedInJars.contains(internalName)) return true;
     if (manualClasses.contains(internalName)) return true;
+    int nestedSeparator = internalName.indexOf('$');
+    if (nestedSeparator > 0 && manualClasses.contains(internalName.substring(0, nestedSeparator))) {
+      return true;
+    }
     for (String prefix : manualPrefixes) {
       if (internalName.startsWith(prefix)) return true;
     }
     return false;
   }
 
-  private static ManualClassConfig loadManualClasses(Path path) {
-    if (path == null || !Files.exists(path)) return new ManualClassConfig(Set.of(), Set.of());
-
+  private static ManualClassConfig loadManualClasses(Path path, List<Path> sourceDirs) {
     Set<String> exact = new HashSet<>();
     Set<String> prefixes = new HashSet<>();
-    try {
-      for (String raw : Files.readAllLines(path, StandardCharsets.UTF_8)) {
-        String line = raw.trim();
-        if (line.isEmpty() || line.startsWith("#")) continue;
-        String normalized = line.replace('.', '/');
-        if (normalized.endsWith("*"))
-          prefixes.add(normalized.substring(0, normalized.length() - 1));
-        else exact.add(normalized);
+
+    if (path != null && Files.exists(path)) {
+      try {
+        for (String raw : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+          String line = raw.trim();
+          if (line.isEmpty() || line.startsWith("#")) continue;
+          String normalized = line.replace('.', '/');
+          if (normalized.endsWith("*")) {
+            prefixes.add(normalized.substring(0, normalized.length() - 1));
+          } else {
+            exact.add(normalized);
+          }
+        }
+      } catch (IOException e) {
+        // Config file missing or unreadable — keep source-dir exclusions.
       }
-    } catch (IOException e) {
-      // Config file missing or unreadable — return empty config
     }
+
+    for (Path sourceDir : sourceDirs) addSourceClasses(sourceDir, exact);
     return new ManualClassConfig(exact, prefixes);
+  }
+
+  private static void addSourceClasses(Path sourceDir, Set<String> exact) {
+    if (sourceDir == null || !Files.isDirectory(sourceDir)) return;
+    try (var files = Files.walk(sourceDir)) {
+      files
+          .filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".java"))
+          .forEach(
+              path -> {
+                Path relative = sourceDir.relativize(path);
+                String name = relative.toString().replace(File.separatorChar, '/');
+                exact.add(name.substring(0, name.length() - ".java".length()));
+              });
+    } catch (IOException e) {
+      // Missing source exclusions only affect generated duplicate avoidance.
+    }
   }
 
   private static String renderStub(StubModel model) {
@@ -592,6 +626,13 @@ public final class StubGenerator {
   }
 
   private static String internalToJavaType(String internalName) {
+    int dollarIdx = internalName.indexOf('$');
+    if (dollarIdx > 0) {
+      String outer = internalName.substring(0, dollarIdx);
+      if (currentManualClasses.contains(outer)) {
+        return internalName.replace('/', '.').replace('$', '.');
+      }
+    }
     return internalName.replace('/', '.');
   }
 
@@ -663,10 +704,22 @@ public final class StubGenerator {
     String input = values.get("--input-dir");
     String output = values.get("--output-dir");
     String manual = values.get("--manual-class-list");
+    String manualSources = values.get("--manual-source-dirs");
+    String profile = values.getOrDefault("--profile", "26x");
     if (input == null || output == null) return null;
 
     Path manualPath = manual == null ? null : Path.of(manual);
-    return new Args(Path.of(input), Path.of(output), manualPath);
+    List<Path> manualSourceDirs = parsePathList(manualSources);
+    return new Args(Path.of(input), Path.of(output), manualPath, manualSourceDirs, profile);
+  }
+
+  private static List<Path> parsePathList(String value) {
+    if (value == null || value.isBlank()) return List.of();
+    List<Path> paths = new ArrayList<>();
+    for (String entry : value.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+      if (!entry.isBlank()) paths.add(Path.of(entry));
+    }
+    return paths;
   }
 
   private static void deleteRecursively(Path root) throws IOException {

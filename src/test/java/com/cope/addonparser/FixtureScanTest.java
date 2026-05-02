@@ -52,20 +52,20 @@ public class FixtureScanTest {
     boolean tmpRootMissingAtStart = !Files.exists(runtimeTmpRoot);
 
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Baritone-Controller--")),
-        "Missing fixture jar for Baritone-Controller");
+        jarNames.stream().anyMatch(name -> name.startsWith("MeteorAdditions--")),
+        "Missing fixture jar for MeteorAdditions");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("mc-games--")),
-        "Missing fixture jar for mc-games");
+        jarNames.stream().anyMatch(name -> name.startsWith("Nora-Tweaks--")),
+        "Missing fixture jar for Nora-Tweaks");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-satellite-addon--")),
-        "Missing fixture jar for meteor-satellite-addon");
+        jarNames.stream().anyMatch(name -> name.startsWith("meteor-addon-template--")),
+        "Missing fixture jar for meteor-addon-template");
     assertTrue(
         jarNames.stream().anyMatch(name -> name.startsWith("meteor-translation-addon--")),
         "Missing fixture jar for meteor-translation-addon");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Trouser-Streak--")),
-        "Missing fixture jar for Trouser-Streak");
+        jarNames.stream().anyMatch(name -> name.startsWith("Seija-Printer--")),
+        "Missing fixture jar for Seija-Printer");
 
     List<String> failures = new ArrayList<>();
     try (AddonScanner scanner = new AddonScanner()) {

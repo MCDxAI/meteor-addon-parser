@@ -2,6 +2,7 @@ package com.cope.addonparser.cli;
 
 import com.cope.addonparser.model.JarScanResult;
 import com.cope.addonparser.model.ScanSummary;
+import com.cope.addonparser.profile.MappingProfile;
 import com.cope.addonparser.scanner.AddonScanner;
 import com.cope.addonparser.scanner.IsolatedScanner;
 import com.cope.addonparser.scanner.RuntimeMode;
@@ -25,6 +26,10 @@ public final class Main {
       return;
     }
 
+    // Make profile visible to in-process consumers (e.g. ValueNormalizer) and forwarded
+    // subprocesses.
+    System.setProperty(MappingProfile.SYSTEM_PROPERTY, parsed.profile.cliValue());
+
     List<Path> jars = collectJars(parsed.input);
     if (jars.isEmpty()) {
       System.err.println("No jar files found in: " + parsed.input);
@@ -40,9 +45,12 @@ public final class Main {
     summary.jarCount = jars.size();
 
     System.out.println("Runtime mode: " + parsed.mode);
+    System.out.println("Mapping profile: " + parsed.profile.cliValue());
 
     try (AutoCloseable scanner =
-        parsed.mode == RuntimeMode.ISOLATED ? new IsolatedScanner() : new AddonScanner()) {
+        parsed.mode == RuntimeMode.ISOLATED
+            ? new IsolatedScanner(parsed.profile)
+            : new AddonScanner(parsed.profile)) {
       for (Path jar : jars) {
         JarScanResult result =
             parsed.mode == RuntimeMode.ISOLATED
@@ -115,15 +123,17 @@ public final class Main {
 
   private static void printUsage() {
     System.out.println(
-        "Usage: java -jar addon-parser.jar --input <jar-or-dir> [--output <dir>] [--summary <file>] [--mode isolated|legacy]");
+        "Usage: java -jar addon-parser.jar --input <jar-or-dir> [--output <dir>] [--summary <file>] [--mode isolated|legacy] [--profile legacy|26x]");
   }
 
-  private record Args(Path input, Path outputDir, Path summaryFile, RuntimeMode mode) {
+  private record Args(
+      Path input, Path outputDir, Path summaryFile, RuntimeMode mode, MappingProfile profile) {
     static Args parse(String[] args) {
       Path input = null;
       Path output = Paths.get("output");
       Path summary = null;
       RuntimeMode mode = RuntimeMode.LEGACY;
+      MappingProfile profile = MappingProfile.fromSystemProperty();
 
       for (int i = 0; i < args.length; i++) {
         String arg = args[i];
@@ -135,13 +145,15 @@ public final class Main {
           summary = Paths.get(args[++i]);
         } else if ("--mode".equals(arg) && i + 1 < args.length) {
           mode = RuntimeMode.fromString(args[++i]);
+        } else if ("--profile".equals(arg) && i + 1 < args.length) {
+          profile = MappingProfile.fromString(args[++i]);
         } else {
           return null;
         }
       }
 
       if (input == null) return null;
-      return new Args(input, output, summary, mode);
+      return new Args(input, output, summary, mode, profile);
     }
   }
 }
