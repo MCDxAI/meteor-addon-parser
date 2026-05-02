@@ -83,11 +83,14 @@ tasks.register('generateStubs', JavaExec) {
     args '--input-dir', 'fixtures/addons/jars',
         '--output-dir', 'src/generated/java',
         '--manual-class-list', 'tools/manual_classes.txt',
+        '--manual-source-dirs', files('src/main/java', profileSourceDir).asPath,
         '--profile', parserProfile
 
     // Incremental support: declare inputs and outputs
     inputs.dir('fixtures/addons/jars')
     inputs.file('tools/manual_classes.txt')
+    inputs.dir('src/main/java')
+    inputs.dir(profileSourceDir)
     inputs.files(sourceSets.stubgen.output)
     outputs.dir('src/generated/java')
 }

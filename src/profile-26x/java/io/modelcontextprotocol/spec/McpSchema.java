@@ -12,6 +12,10 @@ public final class McpSchema {
 
   public interface ResourceContents {}
 
+  public record InitializeResult(String protocolVersion, Object capabilities, Object serverInfo) {}
+
+  public record ListToolsResult(List<Tool> tools, String nextCursor) {}
+
   public record TextContent(String type, String text, Map<String, Object> annotations)
       implements Content {
     public TextContent(String text) {
