@@ -18,6 +18,7 @@ public final class Modules {
   private static boolean strictCategoryCheck = false;
 
   private final Map<Class<? extends Module>, Module> moduleInstances = new HashMap<>();
+  private final Map<String, Module> placeholderInstances = new HashMap<>();
   private final Map<Category, List<Module>> groups = new HashMap<>();
   private final List<Module> active = new ArrayList<>();
   private final Category placeholderCategory = new Category("Meteor");
@@ -64,8 +65,12 @@ public final class Modules {
       if (name.equalsIgnoreCase(module.name)) return module;
     }
 
-    Module placeholder = new Module(placeholderCategory, name, "") {};
-    moduleInstances.put(placeholder.getClass(), placeholder);
+    String key = name.toLowerCase();
+    Module placeholder = placeholderInstances.get(key);
+    if (placeholder != null) return placeholder;
+
+    placeholder = new Module(placeholderCategory, name, "") {};
+    placeholderInstances.put(key, placeholder);
     getGroup(placeholderCategory).add(placeholder);
     return placeholder;
   }

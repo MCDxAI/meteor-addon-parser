@@ -13,7 +13,11 @@ public class SimpleRegistry<T> {
   private final Map<ResourceLocation, T> values = new LinkedHashMap<>();
 
   public void add(T value) {
-    if (value != null) values.put(ResourceLocation.parse(value.getClass().getSimpleName().toLowerCase()), value);
+    if (value != null) {
+      values.put(
+          ResourceLocation.parse("stub_" + Integer.toHexString(System.identityHashCode(value))),
+          value);
+    }
   }
 
   public Set<Map.Entry<ResourceLocation, T>> entrySet() {
