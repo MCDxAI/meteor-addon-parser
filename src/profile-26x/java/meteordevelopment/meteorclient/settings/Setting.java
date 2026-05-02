@@ -102,22 +102,17 @@ public abstract class Setting<T> implements IGetter<T>, ISerializable<T> {
     return NO_SUGGESTIONS;
   }
 
-  protected abstract net.minecraft.class_2487 save(net.minecraft.class_2487 tag);
+  protected abstract net.minecraft.nbt.CompoundTag save(net.minecraft.nbt.CompoundTag tag);
 
   @Override
   public net.minecraft.nbt.CompoundTag toTag() {
-    return new net.minecraft.nbt.CompoundTag();
+    return save(new net.minecraft.nbt.CompoundTag());
   }
 
-  protected abstract T load(net.minecraft.class_2487 tag);
+  protected abstract T load(net.minecraft.nbt.CompoundTag tag);
 
   @Override
   public T fromTag(net.minecraft.nbt.CompoundTag tag) {
-    onChanged();
-    return value;
-  }
-
-  public T fromTag(net.minecraft.class_2487 tag) {
     T loaded = load(tag);
     if (loaded != null) value = loaded;
     onChanged();

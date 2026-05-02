@@ -30,12 +30,12 @@ public class EntityTypeListSetting extends Setting<Set<EntityType<?>>> {
   }
 
   @Override
-  protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
+  protected net.minecraft.nbt.CompoundTag save(net.minecraft.nbt.CompoundTag tag) {
     return tag;
   }
 
   @Override
-  protected Set<EntityType<?>> load(net.minecraft.class_2487 tag) {
+  protected Set<EntityType<?>> load(net.minecraft.nbt.CompoundTag tag) {
     return value;
   }
 

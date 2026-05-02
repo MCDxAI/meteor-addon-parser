@@ -66,10 +66,6 @@ public class Keybind implements ISerializable<Keybind> {
     return this;
   }
 
-  public Keybind fromTag(net.minecraft.class_2487 tag) {
-    return this;
-  }
-
   @Override
   public String toString() {
     if (value == 0) return "None";

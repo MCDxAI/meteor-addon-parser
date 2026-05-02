@@ -29,12 +29,12 @@ public class StatusEffectListSetting extends Setting<List<Holder<MobEffect>>> {
   }
 
   @Override
-  protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
+  protected net.minecraft.nbt.CompoundTag save(net.minecraft.nbt.CompoundTag tag) {
     return tag;
   }
 
   @Override
-  protected List<Holder<MobEffect>> load(net.minecraft.class_2487 tag) {
+  protected List<Holder<MobEffect>> load(net.minecraft.nbt.CompoundTag tag) {
     return value;
   }
 
