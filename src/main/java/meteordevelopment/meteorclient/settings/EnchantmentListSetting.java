@@ -27,12 +27,10 @@ public class EnchantmentListSetting extends Setting<Set<net.minecraft.class_5321
     return value != null;
   }
 
-  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
-  @Override
   protected Set<net.minecraft.class_5321> load(net.minecraft.class_2487 tag) {
     return value;
   }

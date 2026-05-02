@@ -28,12 +28,10 @@ public class EntityTypeListSetting extends Setting<Set<net.minecraft.class_1299>
     return value != null;
   }
 
-  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
-  @Override
   protected Set<net.minecraft.class_1299> load(net.minecraft.class_2487 tag) {
     return value;
   }
@@ -42,6 +40,7 @@ public class EntityTypeListSetting extends Setting<Set<net.minecraft.class_1299>
       extends Setting.SettingBuilder<
           Builder, Set<net.minecraft.class_1299>, EntityTypeListSetting> {
     private boolean onlyAttackable;
+    private java.util.function.Predicate<net.minecraft.class_1299> filter;
 
     public Builder() {
       super(new LinkedHashSet<>());
@@ -57,6 +56,15 @@ public class EntityTypeListSetting extends Setting<Set<net.minecraft.class_1299>
 
     public Builder onlyAttackable() {
       this.onlyAttackable = true;
+      return this;
+    }
+
+    public Builder filter(java.util.function.Predicate<net.minecraft.class_1299> filter) {
+      this.filter = filter;
+      return this;
+    }
+
+    public Builder defaultValue(net.minecraft.world.entity.EntityType<?>... values) {
       return this;
     }
 

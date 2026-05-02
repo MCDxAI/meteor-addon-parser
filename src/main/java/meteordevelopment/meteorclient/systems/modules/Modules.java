@@ -20,6 +20,7 @@ public final class Modules {
   private final Map<Class<? extends Module>, Module> moduleInstances = new HashMap<>();
   private final Map<Category, List<Module>> groups = new HashMap<>();
   private final List<Module> active = new ArrayList<>();
+  private final Category placeholderCategory = new Category("Meteor");
 
   private Modules() {}
 
@@ -62,7 +63,11 @@ public final class Modules {
     for (Module module : moduleInstances.values()) {
       if (name.equalsIgnoreCase(module.name)) return module;
     }
-    return null;
+
+    Module placeholder = new Module(placeholderCategory, name, "") {};
+    moduleInstances.put(placeholder.getClass(), placeholder);
+    getGroup(placeholderCategory).add(placeholder);
+    return placeholder;
   }
 
   public boolean isActive(Class<? extends Module> klass) {

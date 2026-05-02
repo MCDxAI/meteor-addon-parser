@@ -368,6 +368,7 @@ public class ChildFirstClassLoader extends URLClassLoader {
         || name.startsWith("sun.")
         || name.startsWith("org.meteordev.starscript.")
         || name.startsWith("meteordevelopment.starscript.")
-        || name.startsWith("com.cope.addonparser.");
+        || name.startsWith("com.cope.addonparser.")
+        || name.equals("dev.jfronny.meteoradditions.util.IModule");
   }
 }

@@ -46,20 +46,20 @@ public class IsolatedScannerTest {
 
     // Verify expected fixture jars exist
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Baritone-Controller--")),
-        "Missing fixture jar for Baritone-Controller");
+        jarNames.stream().anyMatch(name -> name.startsWith("MeteorAdditions--")),
+        "Missing fixture jar for MeteorAdditions");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("mc-games--")),
-        "Missing fixture jar for mc-games");
+        jarNames.stream().anyMatch(name -> name.startsWith("Nora-Tweaks--")),
+        "Missing fixture jar for Nora-Tweaks");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-satellite-addon--")),
-        "Missing fixture jar for meteor-satellite-addon");
+        jarNames.stream().anyMatch(name -> name.startsWith("meteor-addon-template--")),
+        "Missing fixture jar for meteor-addon-template");
     assertTrue(
         jarNames.stream().anyMatch(name -> name.startsWith("meteor-translation-addon--")),
         "Missing fixture jar for meteor-translation-addon");
     assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Trouser-Streak--")),
-        "Missing fixture jar for Trouser-Streak");
+        jarNames.stream().anyMatch(name -> name.startsWith("Seija-Printer--")),
+        "Missing fixture jar for Seija-Printer");
 
     // Known addon side-effect artifacts that may be created during scanning.
     List<Path> sideEffectPaths =
@@ -127,7 +127,7 @@ public class IsolatedScannerTest {
     // Find a known fixture jar with predictable metadata
     List<Path> jars =
         Files.list(jarDir)
-            .filter(p -> p.getFileName().toString().startsWith("meteor-satellite-addon--"))
+            .filter(p -> p.getFileName().toString().startsWith("meteor-translation-addon--"))
             .toList();
 
     if (jars.isEmpty()) {
@@ -140,7 +140,7 @@ public class IsolatedScannerTest {
       assertTrue(result.success, "Scan should succeed: " + String.join(", ", result.errors));
       assertNotNull(result.jarName, "jarName should be set");
       assertNotNull(result.jarPath, "jarPath should be set");
-      assertTrue(result.jarName.startsWith("meteor-satellite-addon--"), "Unexpected jar name: " + result.jarName);
+      assertTrue(result.jarName.startsWith("meteor-translation-addon--"), "Unexpected jar name: " + result.jarName);
 
       // Verify addon metadata is populated
       assertFalse(result.addons.isEmpty(), "Should have at least one addon");

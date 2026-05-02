@@ -6,6 +6,7 @@ import com.cope.addonparser.model.JarScanResult;
 import com.cope.addonparser.model.ModuleDump;
 import com.cope.addonparser.model.SettingDump;
 import com.cope.addonparser.model.SettingGroupDump;
+import com.cope.addonparser.profile.MappingProfile;
 import com.cope.addonparser.util.ChildFirstClassLoader;
 import com.cope.addonparser.util.FabricModParser;
 import com.cope.addonparser.util.ValueNormalizer;
@@ -40,7 +41,20 @@ public class AddonScanner implements AutoCloseable {
   private static final String KEEP_TMP_PROPERTY = "addonparser.keepTmp";
   private static final Path DEFAULT_TMP_ROOT = Paths.get("tmp", "addon-parser-runtime");
 
-  public AddonScanner() {}
+  private final MappingProfile profile;
+
+  public AddonScanner() {
+    this(MappingProfile.fromSystemProperty());
+  }
+
+  public AddonScanner(MappingProfile profile) {
+    this.profile = profile;
+    System.setProperty(MappingProfile.SYSTEM_PROPERTY, profile.cliValue());
+  }
+
+  public MappingProfile profile() {
+    return profile;
+  }
 
   public JarScanResult scan(Path jarPath) {
     Path absoluteJar = jarPath.toAbsolutePath().normalize();

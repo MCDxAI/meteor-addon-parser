@@ -56,12 +56,10 @@ public class Keybind implements ISerializable<Keybind> {
     return bind;
   }
 
-  @Override
   public net.minecraft.class_2487 toTag() {
     return new net.minecraft.class_2487();
   }
 
-  @Override
   public Keybind fromTag(net.minecraft.class_2487 tag) {
     return this;
   }

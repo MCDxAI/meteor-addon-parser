@@ -36,12 +36,10 @@ public class StringSetting extends Setting<String> {
     return value != null;
   }
 
-  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
-  @Override
   protected String load(net.minecraft.class_2487 tag) {
     return value;
   }

@@ -21,16 +21,8 @@ public final class ValueNormalizer {
   private static final Pattern DEFAULT_OBJECT_TOSTRING = Pattern.compile("^.+@[0-9a-fA-F]+$");
   private static final Map<Object, String> OBJECT_SYMBOL_CACHE =
       Collections.synchronizedMap(new IdentityHashMap<>());
-  private static final YarnMappingResolver YARN = YarnMappingResolver.get();
-  private static final Map<String, List<String>> OWNER_HINTS =
-      Map.of(
-          "net.minecraft.class_1792", List.of("net.minecraft.class_1802"),
-          "net.minecraft.class_2248", List.of("net.minecraft.class_2246"),
-          "net.minecraft.class_3414", List.of("net.minecraft.class_3417"),
-          "net.minecraft.class_1887", List.of("net.minecraft.class_1893"),
-          "net.minecraft.class_5321", List.of("net.minecraft.class_1893"),
-          "net.minecraft.class_1291", List.of("net.minecraft.class_1294"),
-          "net.minecraft.class_6880", List.of("net.minecraft.class_1294"));
+  private static final MappingResolver YARN = MappingResolverFactory.get();
+  private static final Map<String, List<String>> OWNER_HINTS = MappingResolverFactory.ownerHints();
 
   private ValueNormalizer() {}
 
@@ -149,9 +141,9 @@ public final class ValueNormalizer {
         new LinkedHashSet<>(OWNER_HINTS.getOrDefault(valueClass.getName(), List.of()));
 
     // Fallback to nearby registry-like owner classes when we don't have explicit hints.
-    String simple = valueClass.getSimpleName();
-    if ("class_1792".equals(simple)) candidates.add("net.minecraft.class_1802");
-    if ("class_2248".equals(simple)) candidates.add("net.minecraft.class_2246");
+    String fallbackOwner =
+        MappingResolverFactory.fallbackOwnerForSimpleName(valueClass.getSimpleName());
+    if (fallbackOwner != null) candidates.add(fallbackOwner);
 
     ClassLoader loader = valueClass.getClassLoader();
     for (String ownerName : candidates) {

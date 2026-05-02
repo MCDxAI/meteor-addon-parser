@@ -49,7 +49,7 @@ public final class StubGenerator {
           "net/minecraft/class_6880",
           "net/minecraft/class_1269");
 
-  private record Args(Path inputDir, Path outputDir, Path manualClassList) {}
+  private record Args(Path inputDir, Path outputDir, Path manualClassList, String profile) {}
 
   private record ClassEntry(String internalName, byte[] bytes) {}
 
@@ -127,7 +127,7 @@ public final class StubGenerator {
     Args args = parseArgs(argv);
     if (args == null) {
       System.err.println(
-          "Usage: StubGenerator --input-dir <dir> --output-dir <dir> [--manual-class-list <file>]");
+          "Usage: StubGenerator --input-dir <dir> --output-dir <dir> [--manual-class-list <file>] [--profile legacy|26x]");
       System.exit(2);
       return;
     }
@@ -663,10 +663,11 @@ public final class StubGenerator {
     String input = values.get("--input-dir");
     String output = values.get("--output-dir");
     String manual = values.get("--manual-class-list");
+    String profile = values.getOrDefault("--profile", "26x");
     if (input == null || output == null) return null;
 
     Path manualPath = manual == null ? null : Path.of(manual);
-    return new Args(Path.of(input), Path.of(output), manualPath);
+    return new Args(Path.of(input), Path.of(output), manualPath, profile);
   }
 
   private static void deleteRecursively(Path root) throws IOException {

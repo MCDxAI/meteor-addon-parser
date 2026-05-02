@@ -29,12 +29,10 @@ public class ItemListSetting extends Setting<List<net.minecraft.class_1792>> {
     return value != null;
   }
 
-  @Override
   protected net.minecraft.class_2487 save(net.minecraft.class_2487 tag) {
     return tag;
   }
 
-  @Override
   protected List<net.minecraft.class_1792> load(net.minecraft.class_2487 tag) {
     return value;
   }
@@ -54,6 +52,10 @@ public class ItemListSetting extends Setting<List<net.minecraft.class_1792>> {
 
     public Builder filter(java.util.function.Predicate<net.minecraft.class_1792> filter) {
       this.filter = filter;
+      return this;
+    }
+
+    public Builder defaultValue(net.minecraft.world.item.Item... items) {
       return this;
     }
 
