@@ -6,14 +6,11 @@ output/
 # Temporary files
 tmp/
 
-# AI reference materials
+# AI reference materials (kept local; not part of project sources)
 ai_reference/
 
 # Mappings
 mappings/
-
-# Local fixture jars
-fixtures/addons/jars/
 
 # Generated source
 src/generated/

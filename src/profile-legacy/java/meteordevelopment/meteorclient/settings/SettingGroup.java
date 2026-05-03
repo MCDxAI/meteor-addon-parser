@@ -53,16 +53,7 @@ public class SettingGroup implements Iterable<Setting<?>> {
     return new net.minecraft.class_2487();
   }
 
-  public net.minecraft.nbt.CompoundTag toTag(net.minecraft.nbt.CompoundTag tag) {
-    return tag;
-  }
-
-
   public SettingGroup fromTag(net.minecraft.class_2487 tag) {
-    return this;
-  }
-
-  public SettingGroup fromTag(net.minecraft.nbt.CompoundTag tag) {
     return this;
   }
 }

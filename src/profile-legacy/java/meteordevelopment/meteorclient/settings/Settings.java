@@ -119,16 +119,7 @@ public class Settings implements Iterable<SettingGroup> {
     return new net.minecraft.class_2487();
   }
 
-  public net.minecraft.nbt.CompoundTag toTag(net.minecraft.nbt.CompoundTag tag) {
-    return tag;
-  }
-
-
   public Settings fromTag(net.minecraft.class_2487 tag) {
-    return this;
-  }
-
-  public Settings fromTag(net.minecraft.nbt.CompoundTag tag) {
     return this;
   }
 }

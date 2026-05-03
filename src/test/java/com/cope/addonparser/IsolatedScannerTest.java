@@ -1,6 +1,5 @@
 package com.cope.addonparser;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +28,8 @@ public class IsolatedScannerTest {
   @Test
   @Timeout(value = 300, unit = java.util.concurrent.TimeUnit.SECONDS)
   void scansAllFixtureJars() throws Exception {
-    Path jarDir = Path.of(System.getProperty("addonparser.fixtureJarsDir", "fixtures/addons/jars"));
+    Path jarDir =
+        Path.of(System.getProperty("addonparser.fixtureJarsDir", FixtureLayout.defaultJarDir()));
     assertTrue(
         Files.isDirectory(jarDir), "Fixture jar directory missing: " + jarDir.toAbsolutePath());
 
@@ -44,22 +44,14 @@ public class IsolatedScannerTest {
     Set<String> jarNames =
         jars.stream().map(path -> path.getFileName().toString()).collect(Collectors.toSet());
 
-    // Verify expected fixture jars exist
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("MeteorAdditions--")),
-        "Missing fixture jar for MeteorAdditions");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Nora-Tweaks--")),
-        "Missing fixture jar for Nora-Tweaks");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-addon-template--")),
-        "Missing fixture jar for meteor-addon-template");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-translation-addon--")),
-        "Missing fixture jar for meteor-translation-addon");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Seija-Printer--")),
-        "Missing fixture jar for Seija-Printer");
+    for (String prefix : FixtureLayout.expectedJarPrefixes()) {
+      assertTrue(
+          jarNames.stream().anyMatch(name -> name.startsWith(prefix)),
+          "Missing fixture jar with prefix '"
+              + prefix
+              + "' for profile "
+              + FixtureLayout.profile());
+    }
 
     // Known addon side-effect artifacts that may be created during scanning.
     List<Path> sideEffectPaths =
@@ -118,7 +110,8 @@ public class IsolatedScannerTest {
 
   @Test
   void scanResultContainsExpectedMetadata() throws Exception {
-    Path jarDir = Path.of(System.getProperty("addonparser.fixtureJarsDir", "fixtures/addons/jars"));
+    Path jarDir =
+        Path.of(System.getProperty("addonparser.fixtureJarsDir", FixtureLayout.defaultJarDir()));
     if (!Files.isDirectory(jarDir)) {
       // Skip if fixtures not available
       return;
@@ -140,7 +133,9 @@ public class IsolatedScannerTest {
       assertTrue(result.success, "Scan should succeed: " + String.join(", ", result.errors));
       assertNotNull(result.jarName, "jarName should be set");
       assertNotNull(result.jarPath, "jarPath should be set");
-      assertTrue(result.jarName.startsWith("meteor-translation-addon--"), "Unexpected jar name: " + result.jarName);
+      assertTrue(
+          result.jarName.startsWith("meteor-translation-addon--"),
+          "Unexpected jar name: " + result.jarName);
 
       // Verify addon metadata is populated
       assertFalse(result.addons.isEmpty(), "Should have at least one addon");

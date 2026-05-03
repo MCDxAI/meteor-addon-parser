@@ -57,10 +57,6 @@ public class BlockListSetting extends Setting<List<net.minecraft.class_2248>> {
       return this;
     }
 
-    public Builder defaultValue(net.minecraft.world.level.block.Block... blocks) {
-      return this;
-    }
-
     @Override
     public BlockListSetting build() {
       return new BlockListSetting(
