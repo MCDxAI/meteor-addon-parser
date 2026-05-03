@@ -8,6 +8,7 @@ on:
       - master
     paths:
       - 'src/**'
+      - 'fixtures/**'
       - 'build.gradle*'
       - 'settings.gradle*'
       - 'gradle/**'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'fixtures/**'
       - 'build.gradle*'
       - 'settings.gradle*'
       - 'gradle/**'
@@ -31,11 +33,13 @@ concurrency:
 
 jobs:
   test:
-    name: Download Fixtures And Run Tests
+    name: Test (${{ matrix.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [26x, legacy]
 
     steps:
       - name: Check out repository
@@ -52,42 +56,19 @@ jobs:
         with:
           gradle-version: "9.4.1"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - name: Run test suite
+        run: gradle test --no-daemon -PautoGenerateStubs -PparserProfile=${{ matrix.profile }}
 
-      - name: Sync addon source repos
-        run: python tools/download_latest_release_jars.py --update
-
-      - name: Download latest release fixture jars
-        run: gradle downloadLatestReleaseJars --no-daemon
-
-      - name: Run 26x test suite
-        run: gradle test --no-daemon -PautoGenerateStubs -PparserProfile=26x
-
-      - name: Generate 26x JSON output
+      - name: Generate JSON output
         run: >
-          gradle run --no-daemon -PparserProfile=26x
-          --args="--input fixtures/addons/jars --output output/poc-scan --summary output/poc-scan/summary.json --profile 26x"
-
-      - name: Upload release summaries
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-summaries
-          if-no-files-found: warn
-          path: |
-            ai_reference/addons/clone-summary.json
-            fixtures/addons/jars/release-summary.json
-            fixtures/addons/jars/release-summary.csv
-            fixtures/addons/jars/release-summary.txt
+          gradle run --no-daemon -PparserProfile=${{ matrix.profile }}
+          --args="--input fixtures/addons/jars/${{ matrix.profile }} --output output/poc-scan --summary output/poc-scan/summary.json --profile ${{ matrix.profile }}"
 
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: test-reports-${{ matrix.profile }}
           if-no-files-found: warn
           path: |
             build/reports/tests/test/**

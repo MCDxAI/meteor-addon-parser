@@ -66,10 +66,6 @@ public class EntityTypeListSetting extends Setting<Set<net.minecraft.class_1299>
       return this;
     }
 
-    public Builder defaultValue(net.minecraft.world.entity.EntityType<?>... values) {
-      return this;
-    }
-
     @Override
     public EntityTypeListSetting build() {
       return new EntityTypeListSetting(

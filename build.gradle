@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.diffplug.spotless' version '7.0.2'
+    id 'com.diffplug.spotless' version '8.4.0'
 }
 
 group = 'com.cope.addonparser'
@@ -20,6 +20,7 @@ if (parserProfile != 'legacy' && parserProfile != '26x') {
     throw new GradleException("Unknown parserProfile: ${parserProfile} (expected 'legacy' or '26x')")
 }
 def profileSourceDir = parserProfile == 'legacy' ? 'src/profile-legacy/java' : 'src/profile-26x/java'
+def profileFixtureJarsDir = "fixtures/addons/jars/${parserProfile}"
 
 repositories {
     mavenCentral()
@@ -46,6 +47,7 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-noverify'
     systemProperty 'addonparser.profile', parserProfile
+    systemProperty 'addonparser.fixtureJarsDir', profileFixtureJarsDir
 }
 
 application {
@@ -80,33 +82,19 @@ dependencies {
 tasks.register('generateStubs', JavaExec) {
     classpath = sourceSets.stubgen.runtimeClasspath
     mainClass = 'com.cope.addonparser.tools.StubGenerator'
-    args '--input-dir', 'fixtures/addons/jars',
+    args '--input-dir', profileFixtureJarsDir,
         '--output-dir', 'src/generated/java',
         '--manual-class-list', 'tools/manual_classes.txt',
         '--manual-source-dirs', files('src/main/java', profileSourceDir).asPath,
         '--profile', parserProfile
 
     // Incremental support: declare inputs and outputs
-    inputs.dir('fixtures/addons/jars')
+    inputs.dir(profileFixtureJarsDir)
     inputs.file('tools/manual_classes.txt')
     inputs.dir('src/main/java')
     inputs.dir(profileSourceDir)
     inputs.files(sourceSets.stubgen.output)
     outputs.dir('src/generated/java')
-}
-
-tasks.register('downloadLatestReleaseJars', JavaExec) {
-    group = 'build setup'
-    description = 'Downloads latest GitHub release jar assets for repos under ai_reference/addons.'
-    classpath = sourceSets.stubgen.runtimeClasspath
-    mainClass = 'com.cope.addonparser.tools.ReleaseJarDownloader'
-    args '--addons-dir', 'ai_reference/addons',
-        '--jars-dir', 'fixtures/addons/jars',
-        '--fail-on-error'
-
-    inputs.dir('ai_reference/addons')
-    outputs.dir('fixtures/addons/jars')
-    outputs.upToDateWhen { false }
 }
 
 tasks.named('compileJava') {
@@ -153,11 +141,13 @@ tasks.named('clean') {
 
 // AP-009: Spotless configuration for Google Java Style on manual sources
 spotless {
+    ratchetFrom 'master'
+
     java {
         target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/stubgen/java/**/*.java',
             'src/profile-legacy/java/**/*.java', 'src/profile-26x/java/**/*.java'
         targetExclude 'src/generated/java/**'
-        googleJavaFormat()
+        googleJavaFormat('1.35.0')
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

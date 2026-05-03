@@ -57,10 +57,6 @@ public class ItemListSetting extends Setting<List<net.minecraft.class_1792>> {
       return this;
     }
 
-    public Builder defaultValue(net.minecraft.world.item.Item... items) {
-      return this;
-    }
-
     @Override
     public ItemListSetting build() {
       return new ItemListSetting(

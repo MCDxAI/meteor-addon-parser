@@ -58,6 +58,7 @@ public final class StubGenerator {
       String profile) {}
 
   private static Set<String> currentManualClasses = Set.of();
+  private static Set<String> currentNestedGeneratedClasses = Set.of();
 
   private record ClassEntry(String internalName, byte[] bytes) {}
 
@@ -116,6 +117,17 @@ public final class StubGenerator {
 
     StubModel(String internalName) {
       this.internalName = internalName;
+    }
+  }
+
+  private static final class StubTree {
+    final String internalName;
+    StubModel model;
+    final Map<String, StubTree> children = new TreeMap<>();
+
+    StubTree(String internalName, StubModel model) {
+      this.internalName = internalName;
+      this.model = model;
     }
   }
 
@@ -219,7 +231,10 @@ public final class StubGenerator {
       filtered.put(internal, entry.getValue());
     }
 
-    for (Map.Entry<String, StubModel> entry : filtered.entrySet()) {
+    Map<String, StubTree> trees = buildStubTrees(filtered);
+    currentNestedGeneratedClasses = collectNestedGeneratedClasses(trees);
+
+    for (Map.Entry<String, StubTree> entry : trees.entrySet()) {
       String source = renderStub(entry.getValue());
       Path target = outputDir.resolve(entry.getKey() + ".java");
       if (target.getParent() != null) Files.createDirectories(target.getParent());
@@ -456,7 +471,8 @@ public final class StubGenerator {
     if (sourceDir == null || !Files.isDirectory(sourceDir)) return;
     try (var files = Files.walk(sourceDir)) {
       files
-          .filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".java"))
+          .filter(
+              path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".java"))
           .forEach(
               path -> {
                 Path relative = sourceDir.relativize(path);
@@ -468,44 +484,69 @@ public final class StubGenerator {
     }
   }
 
-  private static String renderStub(StubModel model) {
-    String javaName = internalToJavaType(model.internalName);
-    String pkg = "";
-    String simple = javaName;
-    int lastDot = javaName.lastIndexOf('.');
-    if (lastDot > 0) {
-      pkg = javaName.substring(0, lastDot);
-      simple = javaName.substring(lastDot + 1);
+  private static Map<String, StubTree> buildStubTrees(Map<String, StubModel> models) {
+    Map<String, StubTree> trees = new TreeMap<>();
+    for (StubModel model : models.values()) {
+      String topLevel = topLevelInternalName(model.internalName);
+      StubTree root = trees.computeIfAbsent(topLevel, key -> new StubTree(key, new StubModel(key)));
+      addModelToTree(root, model);
+    }
+    return trees;
+  }
+
+  private static void addModelToTree(StubTree root, StubModel model) {
+    if (root.internalName.equals(model.internalName)) {
+      root.model = model;
+      return;
     }
 
+    StubTree current = root;
+    String[] parts = model.internalName.substring(root.internalName.length() + 1).split("\\$");
+    String currentInternal = root.internalName;
+    for (String part : parts) {
+      currentInternal = currentInternal + "$" + part;
+      String childInternal = currentInternal;
+      current =
+          current.children.computeIfAbsent(
+              part, key -> new StubTree(childInternal, new StubModel(childInternal)));
+    }
+    current.model = model;
+  }
+
+  private static Set<String> collectNestedGeneratedClasses(Map<String, StubTree> trees) {
+    Set<String> classes = new HashSet<>();
+    for (StubTree tree : trees.values()) collectNestedGeneratedClasses(tree, false, classes);
+    return classes;
+  }
+
+  private static void collectNestedGeneratedClasses(
+      StubTree tree, boolean nested, Set<String> classes) {
+    if (nested) classes.add(tree.internalName);
+    for (StubTree child : tree.children.values()) {
+      collectNestedGeneratedClasses(child, true, classes);
+    }
+  }
+
+  private static String topLevelInternalName(String internalName) {
+    int dollar = internalName.indexOf('$');
+    return dollar > 0 ? internalName.substring(0, dollar) : internalName;
+  }
+
+  private static String renderStub(StubTree tree) {
+    String pkg = packageName(tree.internalName);
     StringBuilder sb = new StringBuilder();
     sb.append("// AUTO-GENERATED FILE. DO NOT EDIT.\n");
     if (!pkg.isEmpty()) sb.append("package ").append(pkg).append(";\n\n");
+    renderType(sb, tree, simpleSourceName(tree.internalName), 0, false);
+    return sb.toString();
+  }
 
-    sb.append("@SuppressWarnings({\"all\", \"unchecked\"})\n");
-    if (model.isInterface) {
-      sb.append("public interface ").append(simple).append(" {\n");
-    } else {
-      String superName = SUPER_OVERRIDES.get(model.internalName);
-      if (superName != null) {
-        String superJava = internalToJavaType(superName);
-        if (INTERFACE_OVERRIDES.contains(superName)) {
-          sb.append("public class ")
-              .append(simple)
-              .append(" implements ")
-              .append(superJava)
-              .append(" {\n");
-        } else {
-          sb.append("public class ")
-              .append(simple)
-              .append(" extends ")
-              .append(superJava)
-              .append(" {\n");
-        }
-      } else {
-        sb.append("public class ").append(simple).append(" {\n");
-      }
-    }
+  private static void renderType(
+      StringBuilder sb, StubTree tree, String simpleName, int indentLevel, boolean nested) {
+    StubModel model = tree.model;
+    String indent = indent(indentLevel);
+    sb.append(indent).append("@SuppressWarnings({\"all\", \"unchecked\"})\n");
+    sb.append(indent).append(typeDeclaration(model, simpleName, nested)).append(" {\n");
 
     Set<String> seenFieldNames = new HashSet<>();
     for (StubField field : model.fields.values()) {
@@ -514,42 +555,65 @@ public final class StubGenerator {
       String mods = field.isStatic ? "public static" : "public";
       if (model.isInterface && !field.isStatic) mods = "public static";
 
+      sb.append(indent(indentLevel + 1))
+          .append(mods)
+          .append(" ")
+          .append(javaType)
+          .append(" ")
+          .append(field.name);
       if (field.isStatic || model.isInterface) {
-        sb.append("    ")
-            .append(mods)
-            .append(" ")
-            .append(javaType)
-            .append(" ")
-            .append(field.name)
-            .append(" = ")
-            .append(fieldInitExpr(javaType))
-            .append(";\n");
-      } else {
-        sb.append("    ")
-            .append(mods)
-            .append(" ")
-            .append(javaType)
-            .append(" ")
-            .append(field.name)
-            .append(";\n");
+        sb.append(" = ").append(fieldInitExpr(javaType));
       }
+      sb.append(";\n");
     }
 
     if (!model.fields.isEmpty()) sb.append('\n');
 
-    if (!model.isInterface) {
-      Set<String> ctorDescs = new LinkedHashSet<>(model.ctors);
-      ctorDescs.add("()V");
-      List<String> sortedCtors = new ArrayList<>(ctorDescs);
-      sortedCtors.sort(String::compareTo);
-      for (String desc : sortedCtors) {
-        Type methodType = Type.getMethodType(desc);
-        String params = renderParams(methodType.getArgumentTypes());
-        sb.append("    public ").append(simple).append("(").append(params).append(") {\n");
-        sb.append("    }\n\n");
-      }
+    if (!model.isInterface) renderConstructors(sb, model, simpleName, indentLevel + 1);
+    renderMethods(sb, model, indentLevel + 1);
+
+    for (StubTree child : tree.children.values()) {
+      sb.append('\n');
+      renderType(sb, child, childSimpleName(child.internalName), indentLevel + 1, true);
     }
 
+    sb.append(indent).append("}\n");
+  }
+
+  private static String typeDeclaration(StubModel model, String simpleName, boolean nested) {
+    String prefix = nested ? "public static " : "public ";
+    if (model.isInterface) return prefix + "interface " + simpleName;
+
+    String superName = SUPER_OVERRIDES.get(model.internalName);
+    if (superName == null) return prefix + "class " + simpleName;
+
+    String superJava = internalToJavaType(superName);
+    if (INTERFACE_OVERRIDES.contains(superName)) {
+      return prefix + "class " + simpleName + " implements " + superJava;
+    }
+    return prefix + "class " + simpleName + " extends " + superJava;
+  }
+
+  private static void renderConstructors(
+      StringBuilder sb, StubModel model, String simpleName, int indentLevel) {
+    Set<String> ctorDescs = new LinkedHashSet<>(model.ctors);
+    ctorDescs.add("()V");
+    List<String> sortedCtors = new ArrayList<>(ctorDescs);
+    sortedCtors.sort(String::compareTo);
+    for (String desc : sortedCtors) {
+      Type methodType = Type.getMethodType(desc);
+      String params = renderParams(methodType.getArgumentTypes());
+      sb.append(indent(indentLevel))
+          .append("public ")
+          .append(simpleName)
+          .append("(")
+          .append(params)
+          .append(") {\n");
+      sb.append(indent(indentLevel)).append("}\n\n");
+    }
+  }
+
+  private static void renderMethods(StringBuilder sb, StubModel model, int indentLevel) {
     Set<String> seenMethodSigs = new HashSet<>();
     for (StubMethod method : model.methods.values()) {
       if ("<init>".equals(method.name) || "<clinit>".equals(method.name)) continue;
@@ -568,43 +632,21 @@ public final class StubGenerator {
 
       String ret = typeToJava(mt.getReturnType());
       String params = renderParams(args);
-
       if (model.isInterface) {
-        if (method.isStatic)
-          sb.append("    static ")
-              .append(ret)
-              .append(" ")
-              .append(method.name)
-              .append("(")
-              .append(params)
-              .append(") {\n");
-        else
-          sb.append("    default ")
-              .append(ret)
-              .append(" ")
-              .append(method.name)
-              .append("(")
-              .append(params)
-              .append(") {\n");
+        sb.append(indent(indentLevel));
+        if (method.isStatic) sb.append("static ");
+        else sb.append("default ");
       } else {
-        sb.append("    public");
+        sb.append(indent(indentLevel)).append("public");
         if (method.isStatic) sb.append(" static");
-        sb.append(" ")
-            .append(ret)
-            .append(" ")
-            .append(method.name)
-            .append("(")
-            .append(params)
-            .append(") {\n");
+        sb.append(" ");
       }
+      sb.append(ret).append(" ").append(method.name).append("(").append(params).append(") {\n");
 
       String body = defaultReturnExpr(ret);
-      if (!body.isEmpty()) sb.append("        ").append(body).append("\n");
-      sb.append("    }\n\n");
+      if (!body.isEmpty()) sb.append(indent(indentLevel + 1)).append(body).append("\n");
+      sb.append(indent(indentLevel)).append("}\n\n");
     }
-
-    sb.append("}\n");
-    return sb.toString();
   }
 
   private static String renderArgSig(Type[] args) {
@@ -625,11 +667,33 @@ public final class StubGenerator {
     return sb.toString();
   }
 
+  private static String packageName(String internalName) {
+    int slash = internalName.lastIndexOf('/');
+    if (slash < 0) return "";
+    return internalName.substring(0, slash).replace('/', '.');
+  }
+
+  private static String simpleSourceName(String internalName) {
+    int slash = internalName.lastIndexOf('/');
+    String simple = slash < 0 ? internalName : internalName.substring(slash + 1);
+    return simple.replace('$', '.');
+  }
+
+  private static String childSimpleName(String internalName) {
+    int dollar = internalName.lastIndexOf('$');
+    return dollar < 0 ? simpleSourceName(internalName) : internalName.substring(dollar + 1);
+  }
+
+  private static String indent(int level) {
+    return "    ".repeat(level);
+  }
+
   private static String internalToJavaType(String internalName) {
     int dollarIdx = internalName.indexOf('$');
     if (dollarIdx > 0) {
       String outer = internalName.substring(0, dollarIdx);
-      if (currentManualClasses.contains(outer)) {
+      if (currentNestedGeneratedClasses.contains(internalName)
+          || currentManualClasses.contains(outer)) {
         return internalName.replace('/', '.').replace('$', '.');
       }
     }

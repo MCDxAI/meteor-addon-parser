@@ -19,7 +19,8 @@ import org.junit.jupiter.api.Test;
 public class FixtureScanTest {
   @Test
   void scansAllFixtureJars() throws Exception {
-    Path jarDir = Path.of(System.getProperty("addonparser.fixtureJarsDir", "fixtures/addons/jars"));
+    Path jarDir =
+        Path.of(System.getProperty("addonparser.fixtureJarsDir", FixtureLayout.defaultJarDir()));
     assertTrue(
         Files.isDirectory(jarDir), "Fixture jar directory missing: " + jarDir.toAbsolutePath());
 
@@ -51,21 +52,14 @@ public class FixtureScanTest {
                 "addonparser.runtimeTmpDir", Path.of("tmp", "addon-parser-runtime").toString()));
     boolean tmpRootMissingAtStart = !Files.exists(runtimeTmpRoot);
 
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("MeteorAdditions--")),
-        "Missing fixture jar for MeteorAdditions");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Nora-Tweaks--")),
-        "Missing fixture jar for Nora-Tweaks");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-addon-template--")),
-        "Missing fixture jar for meteor-addon-template");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("meteor-translation-addon--")),
-        "Missing fixture jar for meteor-translation-addon");
-    assertTrue(
-        jarNames.stream().anyMatch(name -> name.startsWith("Seija-Printer--")),
-        "Missing fixture jar for Seija-Printer");
+    for (String prefix : FixtureLayout.expectedJarPrefixes()) {
+      assertTrue(
+          jarNames.stream().anyMatch(name -> name.startsWith(prefix)),
+          "Missing fixture jar with prefix '"
+              + prefix
+              + "' for profile "
+              + FixtureLayout.profile());
+    }
 
     List<String> failures = new ArrayList<>();
     try (AddonScanner scanner = new AddonScanner()) {
